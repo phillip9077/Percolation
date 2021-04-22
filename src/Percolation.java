@@ -1,9 +1,9 @@
-import edu.princeton.cs.algs4.QuickUnionUF;
+import edu.princeton.cs.algs4.WeightedQuickUnionUF;
 
 public class Percolation {
 
-    private int[][] grid;
-    private QuickUnionUF unionUF;
+    private boolean[][] grid;
+    private final WeightedQuickUnionUF unionUF;
     private int openSites;
     private final int n;
 
@@ -12,9 +12,9 @@ public class Percolation {
         if (n <= 0) {
             throw new IllegalArgumentException("N cannot be less than or equal to 0");
         }
-        this.grid = new int[n][n];
+        this.grid = new boolean[n][n];
         // last two indices are the virtual sites
-        this.unionUF = new QuickUnionUF(n * n + 2);
+        this.unionUF = new WeightedQuickUnionUF(n * n + 2);
         this.openSites = 0;
         this.n = n;
     }
@@ -27,7 +27,7 @@ public class Percolation {
             throw new IllegalArgumentException("Col number cannot be less than 1 or greater than n");
         }
         if (!this.isOpen(row, col)) {
-            this.grid[row-1][col-1] = 1;
+            this.grid[row-1][col-1] = true;
             this.openSites++;
             if (row == 1) {
                 this.openTopHelper(col);
@@ -46,31 +46,25 @@ public class Percolation {
         } else if (col < 1 || col > this.n) {
             throw new IllegalArgumentException("Col number cannot be less than 1 or greater than n");
         }
-        return this.grid[row-1][col-1] == 1;
+        return this.grid[row-1][col-1];
     }
 
     // is the site (row, col) full?
     public boolean isFull(int row, int col) {
-        // TODO: 1. Figure out this logic
         if (row < 1 || row > this.n) {
             throw new IllegalArgumentException("Row number cannot be less than 1 or greater than n");
         } else if (col < 1 || col > this.n) {
             throw new IllegalArgumentException("Col number cannot be less than 1 or greater than n");
         }
-        // if an OPEN site at (row, col) is connected to any site in the top row,
+        // if an OPEN site at (row, col) is connected to the TOP VIRTUAL SITE
         // then it is a full site.
         if (!this.isOpen(row, col)) {
             return false;
         }
-        // check for a connection between all top sites and the open site at (row, col)
+        // check for a connection between the top virtual site and the open site at (row, col)
         int currSite = this.getProperSite(row, col);
-        for (int i = 1; i <= this.n; i++) {
-            int topSite = this.getProperSite(0, i);
-            if (this.unionUF.find(currSite) == topSite) {
-                return true;
-            }
-        }
-        return false;
+        int virtualTopSite = this.unionUF.find(this.n * this.n);
+        return this.unionUF.find(currSite) == virtualTopSite;
     }
 
     // returns the number of open sites
@@ -80,34 +74,54 @@ public class Percolation {
 
     // does the system percolate?
     public boolean percolates() {
-        // if there is a single site in the bottom row that is a full site,
-        // then we know the system percolates.
-        for (int col = 0; col < this.n; col++) {
-            if (this.isFull(n, col)) {
-                return true;
-            }
-        }
-        return false;
+        // if the bottom virtual site connects to the top virtual site then the system percolates
+        return this.unionUF.find(this.n * this.n + 1) == this.unionUF.find(this.n * this.n);
     }
 
+    // 1-indexed
     private void openTopHelper(int col) {
         // connecting the current site to the virtual top site
-        int currentSite = this.getProperSite(1, col);
+        int currSite = this.getProperSite(1, col);
         int virtualTopSite = this.unionUF.find(this.n * this.n);
-        this.unionUF.union(currentSite, virtualTopSite);
+        this.unionUF.union(currSite, virtualTopSite);
+        // connecting right, left, and bottom sites if they are open as well
+        int rightSite = this.getProperSite(1, col + 1);
+        int leftSite = this.getProperSite(1, col - 1);
+        int botSite = this.getProperSite(2, col);
+        if (currSite != rightSite && this.isOpen(1, col + 1)) {
+            this.unionUF.union(currSite, rightSite);
+        }
+        if (currSite != leftSite && this.isOpen(1, col - 1)) {
+            this.unionUF.union(currSite, leftSite);
+        }
+        if (this.isOpen(2, col)) {
+            this.unionUF.union(currSite, botSite);
+        }
     }
 
+    // 1-indexed
     private void openBotHelper(int col) {
         // connecting the current site to the virtual bottom site
-        int currentSite = this.getProperSite(this.n, col);
+        int currSite = this.getProperSite(this.n, col);
         int virtualBotSite = this.unionUF.find((this.n * this.n) + 1);
-        this.unionUF.union(currentSite, virtualBotSite);
+        this.unionUF.union(currSite, virtualBotSite);
+        // connecting right, left, and top sites if they are open as well
+        int rightSite = this.getProperSite(this.n, col + 1);
+        int leftSite = this.getProperSite(this.n, col - 1);
+        int topSite = this.getProperSite(this.n - 1, col);
+        if (currSite != rightSite && this.isOpen(this.n, col + 1)) {
+            this.unionUF.union(currSite, rightSite);
+        }
+        if (currSite != leftSite && this.isOpen(this.n, col - 1)) {
+            this.unionUF.union(currSite, leftSite);
+        }
+        if (this.isOpen(this.n - 1, col)) {
+            this.unionUF.union(currSite, topSite);
+        }
     }
 
     // 1-indexed
     private void openHelper(int row, int col) {
-        // TODO: Need to make sure the row and col index aren't out of bounds + handle the two
-        //  virtual sites.
         int currSite = this.getProperSite(row, col);
         int leftSite = this.getProperSite(row, col - 1);
         int rightSite = this.getProperSite(row, col + 1);
@@ -158,6 +172,17 @@ public class Percolation {
 
     // test client (optional)
     public static void main(String[] args) {
+        Percolation perc = new Percolation(5);
+        perc.open(1, 1);
+        System.out.println(perc.percolates());
+        perc.open(2, 1);
+        System.out.println(perc.percolates());
+        perc.open(3, 1);
+        System.out.println(perc.percolates());
+        perc.open(4, 1);
+        System.out.println(perc.percolates());
+        perc.open(5, 1);
+        System.out.println(perc.percolates());
     }
 
 }
